@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的工具</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;color:#212121}
+header{background:#1565C0;color:#fff;padding:16px;font-size:18px;font-weight:600;text-align:center}
+.tip{font-size:12px;color:#666;padding:10px 14px;line-height:1.6}
+.list{padding:0 12px 24px;display:flex;flex-direction:column;gap:10px}
+.tool{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:14px;text-decoration:none;color:inherit;box-shadow:0 1px 3px rgba(0,0,0,.06);min-height:64px}
+.tool:active{background:#e8f1fc}
+.icon{font-size:28px;width:44px;text-align:center}
+.meta{flex:1;min-width:0}
+.name{font-size:16px;font-weight:600}
+.desc{font-size:12px;color:#777;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ver{font-size:11px;color:#999;background:#f0f2f5;border-radius:8px;padding:2px 8px}
+.empty{text-align:center;color:#999;font-size:14px;padding:60px 20px;line-height:2}
+</style>
+</head>
+<body>
+<header>我的工具</header>
+<p class="tip">本页是平台入口（浏览器 / PWA 用）。已安装「容器 App」的手机直接在 App 内查看，无需打开此页。点开任意工具即可全屏运行，数据保存在本机。</p>
+<div class="list" id="list"><div class="empty">加载中…</div></div>
+<script>
+function esc(s){return (s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+fetch('manifest.json').then(function(r){return r.json()}).then(function(m){
+  var box=document.getElementById('list');
+  if(!m.tools||!m.tools.length){box.innerHTML='<div class="empty">还没有工具<br>用电脑端生成器发布第一个吧</div>';return}
+  box.innerHTML='';
+  m.tools.forEach(function(t){
+    var a=document.createElement('a');
+    a.className='tool';a.href=t.path;
+    a.innerHTML='<span class="icon">'+esc(t.icon||'🧰')+'</span><span class="meta"><span class="name">'+esc(t.name)+'</span><br><span class="desc">'+esc(t.desc||'')+'</span></span><span class="ver">v'+esc(String(t.version||1))+'</span>';
+    box.appendChild(a);
+  });
+}).catch(function(){
+  document.getElementById('list').innerHTML='<div class="empty">manifest.json 加载失败<br>确认站点已部署且文件存在</div>';
+});
+</script>
+</body>
+</html>

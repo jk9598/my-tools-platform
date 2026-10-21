@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>小农场</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f0f8ff}
+h1{margin:0 0 10px}
+.p{margin:5px 0}
+button{width:100px;height:44px;font-size:16px;margin:3px;background:#4CAF50;color:white;border:none;border-radius:4px}
+button:disabled{background:#aaa}
+ul{padding-left:20px}
+li{margin:4px 0}
+</style>
+</head>
+<body>
+<h1>小农场</h1>
+<div class="p"><strong>等级：</strong><span id="lvl">1</span> | <strong>经验：</strong><span id="exp">0</span> / <span id="need">100</span></div>
+<div class="p"><strong>可种作物</strong></div>
+<div id="plants"></div>
+<div class="p"><strong>已种作物</strong></div>
+<ul id="garden"></ul>
+<script>
+const key='tool_farm_';
+const cropsData={1:'水稻',2:'番茄',3:'棉花',4:'西瓜',5:'橘子'};
+let state={lvl:1,exp:0,crops:[]};
+function load(){const s=localStorage.getItem(key);if(s)state=JSON.parse(s);}
+function save(){localStorage.setItem(key,JSON.stringify(state));}
+function expNeeded(){return 100*Math.pow(2,state.lvl);}
+function curTimer(){return 5*60*1000*Math.pow(2,state.lvl);}
+function updateUI(){
+document.getElementById('lvl').textContent=state.lvl;
+document.getElementById('exp').textContent=state.exp;
+document.getElementById('need').textContent=expNeeded();
+document.getElementById('plants').innerHTML='';
+for(let i=1;i<=state.lvl;i++){
+let btn=document.createElement('button');
+btn.textContent='种 '+cropsData[i];
+btn.onclick=()=>plant(i);
+document.getElementById('plants').appendChild(btn);
+}
+const ul=document.getElementById('garden');
+ul.innerHTML='';
+state.crops.forEach((c,i)=>{
+let li=document.createElement('li');
+let ms=curTimer()-((Date.now()-c.time));
+let min=Math.floor(ms/60000);
+let sec=Math.floor((ms%60000)/1000);
+if(ms<=0){li.textContent=CropsName(c.type)+'已成熟，点击 收获';li.onclick=()=>harvest(i);li.style.cursor='pointer';}
+else{li.textContent=CropsName(c.type)+' '+min+':'+('0'+sec).slice(-2);li.style.cursor='default';}
+ul.appendChild(li);
+});
+}
+function plant(type){
+const age=state.lvl;
+state.crops.push({type,time:Date.now()});
+save();
+updateUI();
+}
+function harvest(idx){
+const c=state.crops[idx];
+state.exp+=c.type;
+state.crops.splice(idx,1);
+if(state.exp>=expNeeded()){levelUp();}
+save();
+updateUI();
+}
+function levelUp(){
+while(state.exp>=expNeeded()){
+state.exp-=expNeeded();
+state.lvl++;
+}
+save();
+updateUI();
+}
+function CropsName(t){return cropsData[t]||'未知';}
+setInterval(()=>{updateUI();},1000);
+load();
+updateUI();
+</script>
+</body>
+</html>

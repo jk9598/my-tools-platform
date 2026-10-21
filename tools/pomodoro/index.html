@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>番茄钟</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family: Arial, sans-serif;background:#f9f9f9;margin:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}
+#timer{font-size:72px;margin:20px 0;color:#333;}
+#round{font-size:20px;margin:5px 0;color:#555;}
+.buttons{display:flex;gap:20px;}
+button{font-size:18px;padding:12px 20px;border:none;border-radius:8px;background:#007bff;color:#fff;cursor:pointer;user-select:none;}
+button:active{background:#0056b3;}
+</style>
+</head>
+<body>
+<div id="timer">25:00</div>
+<div id="round">当前轮次: 1</div>
+<div class="buttons">
+<button id="startPause">开始</button>
+<button id="reset">重置</button>
+</div>
+<script>
+(function(){
+const focus=1500,breakt=300;
+let seconds=focus,mode='focus',running=false,intervalId=null,round=1;
+const stateKey='tool_tomatoState';
+function format(t){const m=Math.floor(t/60).toString().padStart(2,'0');const s=(t%60).toString().padStart(2,'0');return m+':'+s;}
+function updateUI(){document.getElementById('timer').textContent=format(seconds);document.getElementById('round').textContent='当前轮次: '+round;document.getElementById('startPause').textContent=running?'暂停':'开始';}
+function saveState(){localStorage.setItem(stateKey,JSON.stringify({seconds,mode,running,round}));}
+function loadState(){const s=localStorage.getItem(stateKey);if(s){const o=JSON.parse(s);seconds=o.seconds||focus;mode=o.mode||'focus';running=o.running||false;round=o.round||1;}}
+function tick(){if(!running)return;seconds--;if(seconds<0){switchMode();}saveState();updateUI();}
+function switchMode(){if(mode==='focus'){mode='break';seconds=breakt;}else{mode='focus';seconds=focus;round++;}saveState();}
+function start(){if(running)return;running=true;intervalId=setInterval(tick,1000);updateUI();saveState();}
+function pause(){if(!running)return;running=false;clearInterval(intervalId);intervalId=null;updateUI();saveState();}
+function reset(){pause();seconds=focus;mode='focus';round=1;updateUI();saveState();}
+document.getElementById('startPause').addEventListener('click',function(){if(running){pause();}else{start();}});
+document.getElementById('reset').addEventListener('click',reset);
+loadState();updateUI();if(running){intervalId=setInterval(tick,1000);}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>单位换算工具</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:sans-serif;margin:0;padding:0;background:#f8f8f8}
+.container{padding:10px}
+h1{font-size:1.5rem;text-align:center;margin:0 0 10px}
+.row{display:flex;align-items:center;margin-bottom:8px}
+label{flex:0 0 60px;font-size:0.9rem}
+select, input{flex:1;height:44px;font-size:1rem;padding:0 8px;border:1px solid #ccc;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>单位换算工具</h1>
+<div class="row">
+<label>类型：</label>
+<select id="typeSel"></select>
+</div>
+<div class="row">
+<label>左输入：</label>
+<select id="leftUnit"></select>
+<input type="text" id="leftVal" placeholder="0">
+</div>
+<div class="row">
+<label>右输入：</label>
+<select id="rightUnit"></select>
+<input type="text" id="rightVal" placeholder="0">
+</div>
+</div>
+<script>
+(function(){
+const prefix='tool_';
+const storage=localStorage;
+const data={length:{m:'米',km:'千米',ft:'英尺',in:'英寸'},weight:{kg:'千克',jin:'斤',lb:'磅'},temp:{c:'摄氏',f:'华氏'}};
+const factorsLength={m:1,km:1000,ft:0.3048,in:0.0254};
+const factorsWeight={kg:1,jin:0.5,lb:0.453592};
+const typeSel=document.getElementById('typeSel');
+const leftUnit=document.getElementById('leftUnit');
+const rightUnit=document.getElementById('rightUnit');
+const leftVal=document.getElementById('leftVal');
+const rightVal=document.getElementById('rightVal');
+// init selects
+Object.keys(data).forEach(k=>{const opt=document.createElement('option');opt.value=k;opt.textContent=k;typeSel.appendChild(opt);});
+function populateUnits(type){
+leftUnit.innerHTML='';rightUnit.innerHTML='';
+Object.entries(data[type]).forEach(([code,name])=>{
+const o1=document.createElement('option');o1.value=code;o1.textContent=name;leftUnit.appendChild(o1);
+const o2=document.createElement('option');o2.value=code;o2.textContent=name;rightUnit.appendChild(o2);
+});
+}
+function convert(fromVal,fromUnit,toUnit,type){
+if(isNaN(fromVal))return '';
+switch(type){
+case 'length':
+return (+fromVal)* (factorsLength[fromUnit]/factorsLength[toUnit]);break;
+case 'weight':
+return (+fromVal)* (factorsWeight[fromUnit]/factorsWeight[toUnit]);break;
+case 'temp':
+if(fromUnit==='c'){return (+fromVal)*9/5+32;}else{return (+fromVal-32)*5/9;}
+}
+}
+function setState(){
+const t=storage.getItem(prefix+'type')||'length';
+typeSel.value=t;populateUnits(t);
+leftUnit.value=storage.getItem(prefix+'leftUnit')||Object.keys(data[t])[0];
+rightUnit.value=storage.getItem(prefix+'rightUnit')||Object.keys(data[t])[1];
+leftVal.value=storage.getItem(prefix+'leftVal')||'';
+rightVal.value=storage.getItem(prefix+'rightVal')||'';
+}
+function saveState(){
+storage.setItem(prefix+'type',typeSel.value);
+storage.setItem(prefix+'leftUnit',leftUnit.value);
+storage.setItem(prefix+'rightUnit',rightUnit.value);
+storage.setItem(prefix+'leftVal',leftVal.value);
+storage.setItem(prefix+'rightVal',rightVal.value);
+}
+typeSel.addEventListener('change',e=>{
+populateUnits(e.target.value);
+saveState();computeBoth();});
+[leftUnit,rightUnit].forEach(sel=>sel.addEventListener('change',e=>{saveState();computeBoth();}));
+[leftVal,rightVal].forEach(inp=>inp.addEventListener('input',e=>{saveState();computeBoth();}));
+function computeBoth(){
+const type=typeSel.value;
+const l=parseFloat(leftVal.value);
+const r=parseFloat(rightVal.value);
+if(!isNaN(l)){
+rightVal.value=convert(l,leftUnit.value,rightUnit.value,type).toFixed(5).replace(/\.?0+$/,'');
+}else rightVal.value='';
+if(!isNaN(r)){
+leftVal.value=convert(r,rightUnit.value,leftUnit.value,type).toFixed(5).replace(/\.?0+$/,'');
+}else leftVal.value='';
+}
+setState();
+computeBoth();
+})();
+</script>
+</body>
+</html>
