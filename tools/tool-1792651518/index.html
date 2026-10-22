@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>论文工坊 · 十阶段流水线</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef1f4;color:#222;max-width:560px;margin:0 auto;min-height:100vh}
+header{background:#5b3a8e;color:#fff;padding:13px 14px;font-size:17px;font-weight:600}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e2e5e9}
+.tab{flex:1;min-height:46px;border:none;background:none;font-size:14px;color:#666;cursor:pointer}
+.tab.on{color:#5b3a8e;font-weight:600;border-bottom:2px solid #5b3a8e}
+main{padding:12px 12px 28px}
+.card{background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.card h3{font-size:13px;color:#555;margin-bottom:8px;font-weight:600}
+textarea,input[type=text],select{width:100%;border:1px solid #d7dbe0;border-radius:8px;padding:9px;font-size:15px;font-family:inherit;background:#fff;color:#222}
+textarea{min-height:96px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.g2{flex:2}.g1{flex:1}
+button{min-height:44px;border:none;border-radius:8px;background:#5b3a8e;color:#fff;font-size:15px;padding:10px 14px;cursor:pointer}
+button.ghost{background:#fff;color:#5b3a8e;border:1px solid #5b3a8e}
+button.danger{background:#c62828}
+button:disabled{background:#b3a8c7;color:#f2eef8}
+.lbl{font-size:12px;color:#888;margin:8px 0 3px}
+.small{font-size:12px;color:#888;line-height:1.75}
+.bar{height:8px;background:#e4e1ec;border-radius:4px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:#5b3a8e;width:0;transition:width .25s}
+.stage{display:flex;align-items:center;gap:10px;padding:11px 8px;border-bottom:1px solid #f0f0f3;cursor:pointer;min-height:52px}
+.stage:last-child{border-bottom:none}
+.stage .no{width:26px;height:26px;border-radius:50%;background:#eceaf2;color:#8a7ba8;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.stage .nm{flex:1;font-size:15px}
+.stage .st{font-size:11px;padding:2px 8px;border-radius:9px;flex:none}
+.st.done{background:#e6f4ea;color:#1e7e34}
+.st.run{background:#fff3d6;color:#9a6700}
+.st.lock{background:#f0f0f0;color:#999}
+.st.cur{background:#efe9f8;color:#5b3a8e;font-weight:600}
+.stage .wc{font-size:11px;color:#aaa;flex:none}
+.kv{display:flex;gap:8px;font-size:14px;margin:5px 0;line-height:1.6}
+.kv b{color:#5b3a8e;flex:none;font-weight:600}
+pre{background:#f6f4fa;border:1px solid #e4e0ee;border-radius:8px;padding:10px;font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto;font-family:ui-monospace,Consolas,monospace}
+.cand{padding:9px 10px;border:1px solid #d7dbe0;border-radius:8px;margin-top:6px;font-size:14px;cursor:pointer}
+.cand.on{border-color:#5b3a8e;background:#f4f0fb}
+.cand .rs{font-size:12px;color:#888;margin-top:3px}
+.toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);background:#2f3437;color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;z-index:9;max-width:86%;opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.on{opacity:1}
+.warn{background:#fff8e6;border:1px solid #f0e0b0;border-radius:8px;padding:10px;font-size:12px;color:#7a5b00;line-height:1.75;margin-bottom:12px}
+</style>
+</head>
+<body>
+<header>📄 论文工坊 · 十阶段流水线</header>
+<div class="tabs">
+<button class="tab on" data-v="list">流水线</button>
+<button class="tab" data-v="cfg">开题配置</button>
+<button class="tab" data-v="about">关于</button>
+</div>
+<main>
+<section id="v-list">
+<div class="warn">⚠ 学术诚信：本工具是<b>写作辅助与流程编排</b>，不代写、不保证原创性。AI 产出必须自行审阅、核实、改写后使用；涉及事实与文献的内容请标注「待核」，切勿直接作为成果提交。</div>
+<div class="card">
+<h3>总体进度</h3>
+<div class="small" id="statLine">尚未开始</div>
+<div class="bar"><i id="pgBar"></i></div>
+<div class="row">
+<button id="btnExport" class="g2">导出全部产物（.md）</button>
+<button id="btnCopyAll" class="ghost g1">复制全文</button>
+</div>
+</div>
+<div class="card">
+<h3>十个阶段（顺序推进，断点自动保存）</h3>
+<div id="stageList"></div>
+</div>
+</section>
+<section id="v-cfg" style="display:none">
+<div class="card">
+<h3>开题配置（对应原小程序 6 个固定输入）</h3>
+<div class="lbl">学校名称（必填）</div>
+<input type="text" id="fSchool" placeholder="如：XX大学">
+<div class="lbl">专业 / 学科门类（必填）</div>
+<input type="text" id="fMajor" placeholder="如：市场营销 / 理工 / 人文社科">
+<div class="lbl">学历层次</div>
+<select id="fDegree"><option>本科</option><option>硕士</option><option>博士</option></select>
+<div class="lbl">字数要求</div>
+<input type="text" id="fWords" placeholder="如：8000">
+<div class="lbl">论文题目（可空——留空则由「选题开题」阶段凝练）</div>
+<input type="text" id="fTopic" placeholder="还没有题目就留空">
+<div class="lbl">格式规范备注（学校模板/字号/引用样式，如 GB/T 7714）</div>
+<input type="text" id="fSpec" placeholder="没有就留空，用通用规范">
+<div class="row">
+<button id="btnSaveCfg" class="g2">保存配置</button>
+<button id="btnReset" class="danger g1">清空重来</button>
+</div>
+<div class="small" style="margin-top:6px">配置对应流水线的 00_论文元信息.md，会注入每个阶段的提示词。</div>
+</div>
+<div class="card">
+<h3>AI 直连通道（可选，与手工链二选一）</h3>
+<div class="small" style="margin-bottom:8px">不填 = 保持手工流程（复制提示词 → 任意 AI → 回贴）。填好保存 = 阶段页出现「⚡ 调用 AI 生成」，流式出字、可中止，产物直接落入回贴框。Key 只存本机，仅发送到你填的厂商。</div>
+<div class="lbl">通道预设（选完自动填地址和模型，可改）</div>
+<select id="aiPreset"></select>
+<div class="lbl">接口地址（OpenAI 兼容，拼 /chat/completions）</div>
+<input type="text" id="aiUrl" placeholder="https://api.deepseek.com/v1">
+<div class="lbl">模型名</div>
+<input type="text" id="aiModel" placeholder="deepseek-chat">
+<div class="lbl">API Key</div>
+<input type="text" id="aiKey" placeholder="sk-...">
+<div class="row">
+<button id="btnAiSave" class="g2">保存通道</button>
+<button id="btnAiTest" class="ghost g1">测试连接</button>
+<button id="btnAiClear" class="danger g1">停用</button>
+</div>
+<div class="small" id="aiTestR" style="margin-top:6px"></div>
+<div class="small" style="margin-top:6px">已实测支持网页直连（CORS 放行）：DeepSeek / Kimi / 通义千问 / 豆包方舟 / 混元 / OpenAI。智谱等未实测——点「测试连接」即知；若提示跨域被拦，说明该厂商不放开网页直连，用回手工链即可。</div>
+</div>
+</section>
+<section id="v-about" style="display:none">
+<div class="card">
+<h3>这是什么</h3>
+<div class="small">
+把原来的「论文写作流水线 · 微信小程序 + Claude 后端」移植成的<b>单文件网页工具</b>。十阶段定义、状态机、断点续跑、每阶段的任务/验收标准/提示词组装逻辑与原版一致。<br><br>
+<b>两种用法，二选一</b>：<br>
+① <b>手工链（默认）</b>：复制提示词 → 粘贴到任意 AI → 把产出回贴。零配置、零联网、任何设备可用。<br>
+② <b>AI 直连（可选）</b>：在「开题配置」里填 API 通道（端点 + Key + 模型），阶段页出现「⚡ 调用 AI 生成」，流式出字、可中止，产物直接落入回贴框。<br><br>
+<b>与原版的差别</b>：原版由后端直接调 Claude 模型跑完十个阶段；网页版没有后端，「调模型」这步要么你手工完成，要么用你自己的 Key 直连厂商。流程、顺序、验收全不变。<br><br>
+<b>数据与隐私</b>：流水线状态和 API Key 全部只存本机 localStorage，不上传任何服务器；Key 仅随请求发送到你填写的那一家厂商。已实测支持网页直连（CORS 放行）的厂商：DeepSeek / Kimi / 通义千问 / 豆包方舟 / 混元 / OpenAI，其余厂商以「测试连接」结果为准。
+</div>
+</div>
+</section>
+<section id="v-stage" style="display:none">
+<div class="card">
+<h3 id="sdTitle">阶段</h3>
+<div class="kv"><b>调度子技能</b><span id="sdSub"></span></div>
+<div class="kv"><b>任务</b><span id="sdTask"></span></div>
+<div class="kv"><b>验收标准</b><span id="sdAcc"></span></div>
+<div class="lbl">要求输出</div>
+<div class="small" id="sdOuts" style="line-height:1.9"></div>
+<div class="lbl" id="sdExtraL" style="display:none">额外格式要求</div>
+<pre id="sdExtra" style="display:none"></pre>
+<div class="lbl" id="sdLenL" style="display:none">篇幅目标</div>
+<div class="small" id="sdLen" style="display:none"></div>
+<div class="row">
+<button id="btnBrief" class="g2">📋 复制本阶段提示词</button>
+<button id="btnAI" class="g1" style="display:none">⚡ 调用 AI 生成</button>
+<button id="btnTopic" class="ghost g1" style="display:none">📋 复制选题提示词</button>
+</div>
+<div class="row" id="aiRow" style="display:none">
+<div class="small" id="aiStat" style="flex:1;margin:0"></div>
+<button id="btnAiStop" class="ghost g1" style="display:none">中止</button>
+</div>
+<div class="lbl">完整提示词（可长按手动复制）</div>
+<pre id="sdBrief"></pre>
+</div>
+<div class="card" id="candCard" style="display:none">
+<h3>候选题目（阶段 0 专用）</h3>
+<textarea id="candIn" placeholder="把 AI 返回的候选题目原文粘贴到这里（含【题目1】【推荐理由】…），点解析"></textarea>
+<div class="row"><button id="btnCand" class="ghost">解析候选题目</button><button id="btnCandAI" class="ghost" style="display:none">⚡ AI 生成候选</button></div>
+<div id="candList"></div>
+</div>
+<div class="card">
+<h3>产物回贴</h3>
+<textarea id="sdOut" placeholder="把 AI 产出的本阶段 Markdown 全文粘贴到这里，保存后进入下一阶段"></textarea>
+<div class="row">
+<button id="btnSaveOut" class="g2">保存产物，标记完成</button>
+<button id="btnRedo" class="ghost g1">重跑本阶段</button>
+</div>
+<div class="row">
+<button id="btnPrev" class="ghost g1">← 上一阶段</button>
+<button id="btnNext" class="ghost g1">下一阶段 →</button>
+<button id="btnBack" class="ghost g1">返回列表</button>
+</div>
+</div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+var $=function(i){return document.getElementById(i)};
+var KEY='tool_thesis_v1';
+var STAGES=[
+ {id:'proposal',name:'选题开题',sub:'thesis-proposal-writer',task:'凝练论文题目、研究背景/意义、研究问题、研究方法、预期成果、进度安排。',acc:'题目明确、研究问题可回答、方法可行；最终题目单独确定。',outs:['01_选题开题/开题报告.md'],len:'proposal'},
+ {id:'research',name:'文献研究',sub:'academic-deep-research',task:'围绕研究问题检索、筛选、综述文献，形成文献综述与参考文献池。',acc:'覆盖研究问题核心脉络，引用条目含作者/年份/出处等可定位信息。',outs:['02_文献研究/文献综述.md','02_文献研究/参考文献池.md'],len:'research'},
+ {id:'outline',name:'框架搭建',sub:'thesis-outline-builder',task:'产出论文完整目录框架（章-节-小节），每章标注核心论点与论证逻辑。',acc:'结构完整（摘要/绪论/正文/结论/参考文献/致谢），逻辑自洽，章节可映射到文献。',outs:['03_框架搭建/论文大纲.md']},
+ {id:'drafting',name:'正文写作',sub:'academic-paper-writer + 学术论文5视角评审润色专家',task:'按大纲逐章撰写正文，并对每章做一轮多视角评审润色后再进入下一章。',acc:'各章论点清晰、论证完整、引文有出处标注、语言达学术水准。',outs:['04_正文写作/正文草稿.md'],len:'drafting'},
+ {id:'data_viz',name:'数据处理',sub:'dataviz',task:'若正文涉及实验/调研/统计数据，生成规范的图表清单（数据表、趋势图、对比图等），统一标注；纯文字论文可产出「无图表」说明。',acc:'图表清单可复现、有标题与单位、与正文表述一致。',outs:['05_数据处理/图表明细.md'],extra:'每张图独立成段、四要素缺一不可：「## 图N-M 标题」行 +「- 类型：」行（bar/line/pie/table 四选一）+ 表头行 + 数据行。至少 3 张；数据真实可信、与正文一致，确无真实数据时基于合理假设填写并补一句「注：本图数据为示例」。示例：\n## 图4-1 各年级问卷回收量对比\n- 类型：bar\n| 年级 | 回收量 |\n| ---- | ---- |\n| 大一 | 120 |\n| 大二 | 98 |'},
+ {id:'citation',name:'引用格式化',sub:'academic-citation-manager',task:'统一文内引用与文末参考文献列表格式（默认 GB/T 7714，可依学校规范），核对一一对应。',acc:'每条文内引用在参考文献列表可找到，反之亦然，格式统一。',outs:['06_引用格式化/引用核对报告.md']},
+ {id:'integrity',name:'核查诚信',sub:'fact-check + final-integrity-check',task:'核查关键事实/数据/引用真实性，并做整体诚信终检（原创性、数据一致性、引用完整性）。',acc:'高风险事实已核验或标注待核，诚信问题清零或明确列出待处理项。',outs:['07_核查诚信/事实核查报告.md','07_核查诚信/诚信终检报告.md']},
+ {id:'plagiarism',name:'查重降重',sub:'thesis-plagiarism-check',task:'检测高重复段落并降重改写，保留原意与引用规范，产出降重报告与建议。',acc:'高相似段落已改写并标注；无查重工具时做自查式改写建议并明示局限。',outs:['08_查重降重/降重报告.md']},
+ {id:'formatting',name:'格式排版',sub:'thesis-format-output',task:'按学校规范输出最终排版文档（标题层级、字体字号、页边距、目录、页眉页脚等），以 Markdown 定稿承载。',acc:'可直接用于提交，格式符合规范清单。',outs:['09_格式排版/论文定稿.md'],len:'formatting'},
+ {id:'defense',name:'答辩材料',sub:'thesis-defense-material',task:'生成答辩 PPT 大纲、答辩陈述稿、可能被问问题及应答要点。',acc:'三件套齐全，紧扣论文核心贡献。',outs:['10_答辩材料/答辩PPT大纲.md','10_答辩材料/答辩陈述稿.md','10_答辩材料/问答预案.md'],extra:'答辩PPT大纲用分页结构写：每页一行「# 第N页：标题」，下面是「- 」要点（每条一行）。封面页必须含「论文题目：」一行；每页标题 ≤20 字、要点 3~6 条；全文建议 10~14 页；涉及数据图表的页用 Markdown 图片语法引用。'}
+];
+var LEN={proposal:'本阶段「开题报告」正文不少于 2000 字；研究背景、意义、问题、方法、预期成果、进度安排各小节都要成段展开，禁止只写一两句。',
+ research:'本阶段「文献综述」正文目标 3000–5000 字；按主题脉络分小节综述，每小节至少 2～3 个自然段，引用带作者/年份/出处。',
+ drafting:'本阶段「正文草稿」是论文主体，目标篇幅约 {W} 字（宁多勿少，写不到 70% 判不合格）。按大纲逐章逐节写满：每个二级标题下至少 2～4 个自然段，每段 120～220 字，有论点、论证、例证/数据与小结；严禁只列小标题或一句带过。',
+ formatting:'本阶段「论文定稿」应是完整全文，目标篇幅约 {W} 字（宁多勿少）。整理时不得删减实质内容，各章节保持完整段落。',
+ defense:'本阶段「答辩陈述稿」不少于 1200 字，按开场、研究背景、方法、结果、结论展开，成段叙述而非罗列。'};
+var SYS='你是「学位论文写作流水线」的编排器，本轮只完成下方「当前阶段」这一个阶段，不要跳过、不要提前执行后续阶段。\n硬性规则：\n1. 按「要求输出」的结构完整产出，直接输出 Markdown 全文。\n2. 涉及事实、数据、引用时，宁可标注「待核」，也不编造。\n3. 只产出本阶段内容，不覆盖其它阶段。\n4. 正文类产出每个二级标题（##）下写 2~4 个完整自然段，每段 120~220 字，走「论点→论证→例证/数据→小结」；严禁只列小标题+一句话。\n5. 结论/总结必须独立成段展开。\n6. 若某个子技能不可用，用你的内置能力完成，并在产出顶部注明「本阶段因子技能 X 不可用，由内置能力完成」。';
+var state=null,cur=-1;
+var tm;function toast(m){var t=$('toast');t.textContent=m;t.className='toast on';clearTimeout(tm);tm=setTimeout(function(){t.className='toast'},2400)}
+function load(){try{state=JSON.parse(localStorage.getItem(KEY))}catch(e){state=null}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function words(){
+ var v=(state&&state.meta&&state.meta.wordCount)||$('fWords').value||'';
+ return parseInt(String(v).replace(/[^\d]/g,''))||0;
+}
+function metaText(){
+ var m=state&&state.meta?state.meta:{};
+ return '学校名称：'+(m.school||'（未填）')+'\n专业/学科门类：'+(m.major||'（未填）')+'\n学历层次：'+(m.degree||'本科')+'\n字数要求：'+(m.wordCount||'（未填）')+'\n论文题目：'+(m.topic||'（待选题开题阶段凝练）')+'\n格式规范备注：'+(m.spec||'（无，用通用规范）');
+}
+function statusOf(i){
+ if(!state)return 'lock';
+ var s=state.stages[i];
+ if(s.status==='done')return 'done';
+ if(i===firstOpen())return 'cur';
+ return 'lock';
+}
+function firstOpen(){
+ if(!state)return 0;
+ for(var i=0;i<10;i++)if(state.stages[i].status!=='done')return i;
+ return 9;
+}
+function renderList(){
+ if(!state){$('statLine').textContent='尚未开始：先到「开题配置」填 6 个输入，保存后自动初始化流水线。';$('pgBar').style.width='0%';$('stageList').innerHTML='';return;}
+ var done=0,total=0;
+ state.stages.forEach(function(s){if(s.status==='done'){done++;total+=(s.output||'').length;}});
+ $('statLine').textContent='已完成 '+done+'/10 阶段 · 产物共 '+total+' 字 · 当前：'+(done>=10?'全部完成 🎉':STAGES[firstOpen()].name);
+ $('pgBar').style.width=(done/10*100)+'%';
+ var h='';
+ STAGES.forEach(function(d,i){
+  var st=statusOf(i),label=st==='done'?'已完成':(st==='cur'?'进行中':(st==='run'?'':'未开始'));
+  var wc=(state.stages[i].output||'').length;
+  h+='<div class="stage" data-i="'+i+'"><span class="no">'+(i+1)+'</span><span class="nm">'+d.name+'</span><span class="st '+st+'">'+label+'</span><span class="wc">'+(wc?wc+' 字':'')+'</span></div>';
+ });
+ $('stageList').innerHTML=h;
+ Array.prototype.forEach.call($('stageList').querySelectorAll('.stage'),function(el){
+  el.onclick=function(){openStage(parseInt(el.getAttribute('data-i')));};
+ });
+}
+function buildStageBrief(i){
+ var d=STAGES[i],m=[];
+ m.push(SYS,'','---','','# 论文流水线 · 阶段 '+(i+1)+'：'+d.name,'','【调度子技能】'+d.sub,'','【任务】'+d.task,'','【要求输出（按此结构产出）】');
+ d.outs.forEach(function(o){m.push('- thesis_output/'+o);});
+ if(d.extra){m.push('',d.extra);}
+ m.push('','【验收标准】'+d.acc);
+ if(d.len){
+  var t=LEN[d.len].replace('{W}',String(Math.max(words(),4000)));
+  m.push('','【本阶段篇幅目标（硬性）】'+t);
+ }
+ m.push('','【论文元信息】','```',metaText(),'```');
+ var ups=[];
+ if(state)state.stages.forEach(function(s,j){if(j<i&&s.status==='done'&&s.output)ups.push('### thesis_output/'+STAGES[j].outs[0]+'\n```\n'+s.output.slice(0,5000)+'\n```');});
+ m.push('','【上游产物内容（作为本阶段输入）】');
+ if(ups.length)m.push.apply(m,ups);else m.push('- （暂无，这是第一阶段）');
+ m.push('','请开始执行本阶段，直接输出产出的 Markdown 全文。');
+ return m.join('\n');
+}
+function buildTopicBrief(){
+ var t=state&&state.meta&&state.meta.topic?state.meta.topic:'';
+ return '你是学位论文选题专家。请基于下面论文元信息，凝练出 3 个可行的论文题目候选（标题精炼、学术化，三个切入角度应有所区分）。\n'+
+ (t?'用户已给出初始题目「'+t+'」：请保留它作为候选之一，再给出 2 个不同或更优切入点的题目。':'用户未给出题目：请给出 3 个不同切入点的合适题目。')+
+ '\n\n【论文元信息】\n```\n'+metaText()+'\n```\n\n请严格按以下格式输出（不要多余文字）：\n【题目1】<题目一>\n【推荐理由】<一句话推荐理由>\n【题目2】<题目二>\n【推荐理由】<一句话推荐理由>\n【题目3】<题目三>\n【推荐理由】<一句话推荐理由>';
+}
+var AKEY='tool_thesis_ai';
+var AI_PRESETS=[
+ {n:'DeepSeek',u:'https://api.deepseek.com/v1',m:'deepseek-chat'},
+ {n:'Kimi（Moonshot）',u:'https://api.moonshot.cn/v1',m:'moonshot-v1-8k'},
+ {n:'通义千问（DashScope 兼容模式）',u:'https://dashscope.aliyuncs.com/compatible-mode/v1',m:'qwen-plus'},
+ {n:'豆包（火山方舟，填你的端点 ID）',u:'https://ark.cn-beijing.volces.com/api/v3',m:'ep-xxxx'},
+ {n:'混元（腾讯云）',u:'https://api.hunyuan.cloud.tencent.com/v1',m:'hunyuan-turbos-latest'},
+ {n:'OpenAI',u:'https://api.openai.com/v1',m:'gpt-4o-mini'},
+ {n:'自定义',u:'',m:''}
+];
+function aiCfg(){try{return JSON.parse(localStorage.getItem(AKEY))||{}}catch(e){return {}}}
+function aiSaveCfg(c){localStorage.setItem(AKEY,JSON.stringify(c))}
+function aiOn(){var c=aiCfg();return !!(c.url&&c.key&&c.model)}
+function aiRefresh(){
+ var on=aiOn();
+ $('btnAI').style.display=on?'':'none';
+ $('btnCandAI').style.display=on?'':'none';
+}
+function aiStat(busy,msg){
+ if(msg)$('aiStat').textContent=msg;
+ $('aiRow').style.display=msg?'':'none';
+ $('btnAiStop').style.display=busy?'':'none';
+}
+var aiCtl=null;
+function aiDone(t,msg,sink){
+ aiCtl=null;
+ if(sink)sink(t);
+ aiStat(false,msg);
+}
+function aiCall(brief,sink,liveOut){
+ if(aiCtl)return toast('正在生成中，先中止或等待完成');
+ var c=aiCfg();
+ if(!c.url||!c.key||!c.model)return toast('先填好接口地址、模型名和 Key');
+ aiCtl=new AbortController();
+ var acc='';
+ if(liveOut)$('sdOut').value='';
+ aiStat(true,'正在请求 '+c.url+' …');
+ fetch(c.url.replace(/\/+$/,'')+'/chat/completions',{
+  method:'POST',signal:aiCtl.signal,
+  headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.key},
+  body:JSON.stringify({model:c.model,stream:true,temperature:0.3,messages:[{role:'user',content:brief}]})
+ }).then(function(r){
+  if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+' '+t.slice(0,200))});
+  var ct=r.headers.get('content-type')||'';
+  if(ct.indexOf('event-stream')<0||!r.body||!r.body.getReader){
+   return r.json().then(function(j){
+    acc=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||'';
+    aiDone(acc,'非流式返回，共 '+acc.length+' 字',sink);
+   });
+  }
+  var rd=r.body.getReader(),dec=new TextDecoder(),buf='';
+  function pump(){
+   return rd.read().then(function(x){
+    if(x.done){aiDone(acc,'生成完成，共 '+acc.length+' 字',sink);return;}
+    buf+=dec.decode(x.value,{stream:true});
+    var ls=buf.split('\n');buf=ls.pop();
+    ls.forEach(function(l){
+     l=l.replace(/\r$/,'');
+     if(l.slice(0,5)!=='data:')return;
+     var d=l.slice(5).trim();
+     if(d==='[DONE]'||!d)return;
+     try{
+      var j=JSON.parse(d),t=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;
+      if(t){acc+=t;if(liveOut)$('sdOut').value=acc;aiStat(true,'生成中…已接收 '+acc.length+' 字');}
+     }catch(e){}
+    });
+    return pump();
+   });
+  }
+  return pump();
+ }).catch(function(e){
+  aiCtl=null;
+  if(e.name==='AbortError'){aiDone(acc,'已中止，保留已生成 '+acc.length+' 字（可续写或直接保存）',sink);}
+  else{
+   var m=e.message||String(e);
+   if(m.indexOf('Failed to fetch')>=0)m+='（多为跨域被拦或网络不通：该端点可能不支持网页直连，可改用复制提示词）';
+   aiStat(false,'调用失败：'+m);
+   if(acc&&liveOut)$('sdOut').value=acc.trim();
+  }
+ });
+}
+function aiRunStage(){
+ if(cur<0)return;
+ aiCall(buildStageBrief(cur),function(t){$('sdOut').value=(t||'').trim();},true);
+}
+function aiRunCand(){
+ aiCall(buildTopicBrief(),function(t){
+  $('candIn').value=t;
+  parseCands();
+  toast('候选题目已生成，点选一条自动填入');
+ },false);
+}
+function aiTest(){
+ var u=$('aiUrl').value.trim(),k=$('aiKey').value.trim(),m=$('aiModel').value.trim();
+ if(!u||!k||!m)return toast('接口地址、模型名、Key 都要填');
+ $('aiTestR').textContent='正在测试 '+u+' …';
+ fetch(u.replace(/\/+$/,'')+'/chat/completions',{
+  method:'POST',
+  headers:{'Content-Type':'application/json','Authorization':'Bearer '+k},
+  body:JSON.stringify({model:m,stream:false,max_tokens:1,messages:[{role:'user',content:'ping'}]})
+ }).then(function(r){
+  return r.text().then(function(t){
+   $('aiTestR').textContent=r.ok?('✓ 通道可用（HTTP '+r.status+'，模型回包：'+t.slice(0,80)+'）'):('✗ HTTP '+r.status+'：'+t.slice(0,200));
+  });
+ }).catch(function(e){
+  var m2=e.message||String(e);
+  if(m2.indexOf('Failed to fetch')>=0)m2+='（跨域被拦或网络不通：该端点不支持网页直连）';
+  $('aiTestR').textContent='✗ '+m2;
+ });
+}
+function openStage(i){
+ if(!state)return toast('请先保存开题配置');
+ var st=statusOf(i);
+ if(st==='lock')return toast('顺序推进中：请先完成「'+STAGES[firstOpen()].name+'」');
+ cur=i;
+ var d=STAGES[i];
+ $('sdTitle').textContent='阶段 '+(i+1)+' · '+d.name;
+ $('sdSub').textContent=d.sub;
+ $('sdTask').textContent=d.task;
+ $('sdAcc').textContent=d.acc;
+ $('sdOuts').innerHTML=d.outs.map(function(o){return '· thesis_output/'+o;}).join('<br>');
+ $('sdExtra').textContent=d.extra||'';$('sdExtra').style.display=d.extra?'':'none';$('sdExtraL').style.display=d.extra?'':'none';
+ var lenTxt=d.len?LEN[d.len].replace('{W}',String(Math.max(words(),4000))):'';
+ $('sdLen').textContent=lenTxt;$('sdLen').style.display=lenTxt?'':'none';$('sdLenL').style.display=lenTxt?'':'none';
+ $('sdBrief').textContent=buildStageBrief(i);
+ $('btnTopic').style.display=i===0?'':'none';
+ $('candCard').style.display=i===0?'':'none';
+ aiRefresh();
+ $('sdOut').value=state.stages[i].output||'';
+ show('stage');
+}
+function parseCandidates(text){
+ var lines=String(text||'').split('\n'),out=[],c=null;
+ lines.forEach(function(l){
+  l=l.trim();
+  var t=l.match(/^【题目\s*\d+】\s*(.+)$/);
+  if(t){if(c&&c.title)out.push(c);c={title:t[1].trim(),reason:''};return;}
+  var r=l.match(/^【推荐理由】\s*(.+)$/);
+  if(r&&c)c.reason=r[1].trim();
+ });
+ if(c&&c.title)out.push(c);
+ return out.filter(function(x){return x.title;}).slice(0,3).map(function(x){return {title:x.title.replace(/^《|》$/g,'').trim(),reason:(x.reason||'').trim()};});
+}
+function parseCands(){
+ var out=parseCandidates($('candIn').value);
+ if(!out.length)return toast('没解析出候选题目，检查格式是否含【题目1】');
+ var h='';
+ out.forEach(function(x,k){
+  h+='<div class="cand'+(state.meta.topic===x.title?' on':'')+'" data-t="'+x.title.replace(/"/g,'&quot;')+'"><b>题目'+(k+1)+'：'+x.title+'</b><div class="rs">'+x.reason+'</div></div>';
+ });
+ $('candList').innerHTML=h;
+ Array.prototype.forEach.call($('candList').querySelectorAll('.cand'),function(el){
+  el.onclick=function(){
+   state.meta.topic=el.getAttribute('data-t');save();
+   $('fTopic').value=state.meta.topic;
+   toast('已选定题目，将注入后续阶段');
+   parseCandsRefresh();
+  };
+ });
+}
+function parseCandsRefresh(){
+ Array.prototype.forEach.call($('candList').querySelectorAll('.cand'),function(el){
+  el.className='cand'+(state.meta.topic===el.getAttribute('data-t')?' on':'');
+ });
+}
+function copy(text,ok){
+ function done(){toast(ok||'已复制到剪贴板')}
+ function fail(){toast('复制失败，请长按上方文本手动复制')}
+ if(navigator.clipboard&&navigator.clipboard.writeText){
+  navigator.clipboard.writeText(text).then(done,fail);
+ }else fail();
+}
+function show(v){
+ ['list','cfg','about','stage'].forEach(function(x){$('v-'+x).style.display=x===v?'':'none';});
+ if(v!=='stage'){renderList();}
+ Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){b.classList.toggle('on',b.getAttribute('data-v')===v||(v==='stage'&&b.getAttribute('data-v')==='list'));});
+}
+function exportAll(){
+ if(!state)return toast('还没有产物');
+ var m=['# thesis_output · 打包导出','','## 00_论文元信息.md','```',metaText(),'```'];
+ var any=false;
+ state.stages.forEach(function(s,i){
+  if(s.status==='done'&&s.output){
+   any=true;
+   m.push('','## '+STAGES[i].outs[0],'','（对应阶段：'+STAGES[i].name+'）','',s.output);
+  }
+ });
+ if(!any)return toast('还没有已完成的阶段');
+ var blob=new Blob([m.join('\n')],{type:'text/markdown;charset=utf-8'});
+ var a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='论文产物导出.md';
+ document.body.appendChild(a);a.click();document.body.removeChild(a);
+ toast('已开始下载：论文产物导出.md');
+}
+Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){b.onclick=function(){show(b.getAttribute('data-v'));};});
+$('btnExport').onclick=exportAll;
+$('btnCopyAll').onclick=function(){
+ if(!state)return toast('还没有产物');
+ var t=['# thesis_output','','## 00_论文元信息.md',metaText()];
+ var any=false;
+ state.stages.forEach(function(s,i){if(s.status==='done'&&s.output){any=true;t.push('','## '+STAGES[i].outs[0],'',s.output);}});
+ if(!any)return toast('还没有已完成的阶段');
+ copy(t.join('\n'),'全文已复制');
+};
+$('btnSaveCfg').onclick=function(){
+ var school=$('fSchool').value.trim(),major=$('fMajor').value.trim();
+ if(!school||!major)return toast('学校和专业必填');
+ if(!state){
+  state={meta:{},topic:'',stages:STAGES.map(function(d){return {id:d.id,status:'pending',output:''};})};
+ }
+ state.meta={school:school,major:major,degree:$('fDegree').value,wordCount:$('fWords').value.trim(),topic:$('fTopic').value.trim(),spec:$('fSpec').value.trim()};
+ save();toast('配置已保存'+(state.stages.every(function(s){return s.status==='pending';})?'，流水线已初始化':''));
+ show('list');
+};
+$('btnReset').onclick=function(){
+ var b=$('btnReset');
+ if(b.textContent.indexOf('再点一次')<0){b.textContent='再点一次确认清空';setTimeout(function(){b.textContent='清空重来';},3000);return;}
+ b.textContent='清空重来';
+ state=null;localStorage.removeItem(KEY);
+ ['fSchool','fMajor','fWords','fTopic','fSpec'].forEach(function(i){$(i).value='';});
+ $('fDegree').value='本科';
+ toast('已清空，重新填写开题配置');
+ show('list');
+};
+$('btnBrief').onclick=function(){copy($('sdBrief').textContent,'阶段提示词已复制，去任意 AI 粘贴');};
+$('btnTopic').onclick=function(){copy(buildTopicBrief(),'选题提示词已复制');};
+$('btnCand').onclick=parseCands;
+$('btnSaveOut').onclick=function(){
+ if(cur<0)return;
+ var v=$('sdOut').value.trim();
+ if(!v)return toast('先粘贴本阶段产物');
+ state.stages[cur].output=v;
+ state.stages[cur].status='done';
+ // 阶段 0 验收标准之一：把最终题目写回状态机（用户未手动选定候选题目时，从开题报告识别）
+ if(cur===0&&!(state.meta.topic||'').trim()){
+  var mm=v.match(/(?:论文题目|题目|标题)\s*[：:]\s*[《「]?([^》」\n：:]{4,50})[》」]?/);
+  if(mm){
+   state.meta.topic=mm[1].trim();
+   $('fTopic').value=state.meta.topic;
+   toast('已从开题报告识别题目：'+state.meta.topic+'（可在开题配置里改）');
+  }
+ }
+ save();toast('已保存，「'+STAGES[cur].name+'」完成');
+ if(cur<9&&statusOf(cur+1)!=='lock'){openStage(cur+1);}else{show('list');}
+};
+$('btnRedo').onclick=function(){
+ if(cur<0)return;
+ state.stages[cur].status='pending';
+ save();toast('已重置为待开始，可重新生成提示词');
+ openStage(cur);
+};
+$('btnPrev').onclick=function(){if(cur>0)openStage(cur-1);};
+$('btnNext').onclick=function(){if(cur<9)openStage(cur+1);};
+$('btnBack').onclick=function(){show('list');};
+$('btnAI').onclick=function(){aiRunStage();};
+$('btnCandAI').onclick=function(){aiRunCand();};
+$('btnAiStop').onclick=function(){if(aiCtl){aiCtl.abort();toast('已发送中止');}};
+$('btnAiSave').onclick=function(){
+ var u=$('aiUrl').value.trim(),k=$('aiKey').value.trim(),m=$('aiModel').value.trim();
+ if(!u||!k||!m)return toast('接口地址、模型名、Key 都要填；不想用就点「停用」');
+ aiSaveCfg({url:u,key:k,model:m});
+ aiRefresh();
+ toast('AI 通道已保存，阶段页出现「⚡ 调用 AI 生成」');
+};
+$('btnAiClear').onclick=function(){
+ localStorage.removeItem(AKEY);
+ ['aiUrl','aiModel','aiKey'].forEach(function(i){$(i).value='';});
+ $('aiTestR').textContent='';
+ aiRefresh();
+ toast('已停用 AI 通道，回到手工链');
+};
+$('btnAiTest').onclick=aiTest;
+(function(){
+ var sel=$('aiPreset');
+ AI_PRESETS.forEach(function(p,i){
+  var o=document.createElement('option');o.value=String(i);o.textContent=p.n;sel.appendChild(o);
+ });
+ sel.onchange=function(){
+  var p=AI_PRESETS[parseInt(sel.value,10)];
+  if(p.u){$('aiUrl').value=p.u;$('aiModel').value=p.m;}
+ };
+ var c=aiCfg(),hit=-1;
+ if(c.url){
+  $('aiUrl').value=c.url;$('aiModel').value=c.model||'';$('aiKey').value=c.key||'';
+  for(var i=0;i<AI_PRESETS.length;i++)if(AI_PRESETS[i].u===c.url){hit=i;break;}
+  sel.value=hit>=0?String(hit):String(AI_PRESETS.length-1);
+ }
+ aiRefresh();
+})();
+(function(){
+ load();
+ if(state&&state.meta){
+  $('fSchool').value=state.meta.school||'';
+  $('fMajor').value=state.meta.major||'';
+  $('fDegree').value=state.meta.degree||'本科';
+  $('fWords').value=state.meta.wordCount||'';
+  $('fTopic').value=state.meta.topic||'';
+  $('fSpec').value=state.meta.spec||'';
+ }
+ renderList();
+})();
+</script>
+</body>
+</html>
